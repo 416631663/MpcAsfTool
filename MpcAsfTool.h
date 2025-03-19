@@ -2,20 +2,20 @@
 #define MPCASFTOOL_H
 
 //(*Headers(MpcAsfTool)
+#include <wx/button.h>
+#include <wx/checkbox.h>
+#include <wx/clrpicker.h>
+#include <wx/frame.h>
+#include <wx/menu.h>
+#include <wx/panel.h>
+#include <wx/radiobut.h>
 #include <wx/scrolwin.h>
 #include <wx/sizer.h>
-#include <wx/stattext.h>
-#include <wx/menu.h>
-#include <wx/checkbox.h>
-#include <wx/spinctrl.h>
-#include <wx/statline.h>
-#include <wx/radiobut.h>
 #include <wx/slider.h>
-#include <wx/panel.h>
+#include <wx/spinctrl.h>
 #include <wx/statbmp.h>
-#include <wx/button.h>
-#include <wx/frame.h>
-#include <wx/clrpicker.h>
+#include <wx/statline.h>
+#include <wx/stattext.h>
 //*)
 #include "wx/dnd.h"
 #include "wx/timer.h"
@@ -35,85 +35,85 @@ class MpcAsfTool: public wxFrame
 	private:
 
 		//(*Declarations(MpcAsfTool)
-		wxStaticText* StaticText10;
-		wxSpinCtrl* SpinCtrl_ShadowAlpha;
-		wxStaticText* StaticText22;
-		wxStaticText* StaticText9;
-		wxSpinCtrl* SpinCtrl_ShadowX;
-		wxStaticText* StaticText20;
-		wxStaticText* StaticText_Frame_Sum;
-		wxStaticLine* StaticLine8;
-		wxCheckBox* CheckBox_LockPicOffset;
-		wxScrolledWindow* ScrolledWindow_BmpShow;
-		wxSpinCtrl* SpinCtrl_PicOffX;
-		wxButton* Button_UnDelete;
-		wxSlider* Slider_Interval;
-		wxCheckBox* CheckBox_LockFrame;
-		wxSpinCtrl* SpinCtrl_PicOffY;
-		wxStaticLine* StaticLine10;
-		wxStaticText* StaticText13;
-		wxStaticText* StaticText2;
-		wxStaticLine* StaticLine6;
-		wxRadioButton* RadioButton_AsfShadow;
-		wxStaticText* StaticText14;
-		wxRadioButton* RadioButton_MpcShadow;
-		wxStaticText* StaticText26;
-		wxStaticText* StaticText6;
-		wxStaticLine* StaticLine9;
-		wxSpinCtrl* SpinCtrl_SunX;
-		wxStaticText* StaticText19;
-		wxStaticText* StaticText8;
-		wxButton* Button_Animate;
-		wxStaticText* StaticText11;
-		wxButton* Button_AdjustPosition;
-		wxStaticText* StaticText18;
-		wxSlider* Slider_Frame;
-		wxPanel* Panel1;
-		wxStaticText* StaticText1;
-		wxStaticText* StaticText27;
-		wxStaticText* StaticText3;
-		wxButton* Button_DeleteCurrentFrame;
-		wxStaticLine* StaticLine7;
 		wxButton* Button_AddFrames;
-		wxStaticText* StaticText21;
-		wxStaticLine* StaticLine4;
-		wxStaticLine* StaticLine2;
-		wxStaticLine* StaticLine12;
-		wxStaticText* StaticText23;
-		wxColourPickerCtrl* ColourPickerCtrl_BaseColor;
-		wxStaticText* StaticText24;
+		wxButton* Button_AdjustPosition;
+		wxButton* Button_Animate;
+		wxButton* Button_DeleteCurrentFrame;
+		wxButton* Button_UnDelete;
+		wxCheckBox* CheckBox_AssiLine;
+		wxCheckBox* CheckBox_KeepSet;
+		wxCheckBox* CheckBox_LockFrame;
+		wxCheckBox* CheckBox_LockPicOffset;
 		wxCheckBox* CheckBox_NextLock;
 		wxCheckBox* CheckBox_ShowShd;
-		wxCheckBox* CheckBox_AssiLine;
-		wxStaticText* StaticText5;
+		wxColourPickerCtrl* ColourPickerCtrl_BaseColor;
 		wxMenuBar* MenuBar_MpcAsfTool;
-		wxStaticText* StaticText7;
-		wxCheckBox* CheckBox_KeepSet;
-		wxSpinCtrl* SpinCtrl_SunY;
-		wxSpinCtrl* SpinCtrl_Bottom;
-		wxStaticLine* StaticLine3;
-		wxStaticLine* StaticLine1;
-		wxSpinCtrl* SpinCtrl_AlphaMask;
-		wxSpinCtrl* SpinCtrl_ShadowY;
-		wxStaticBitmap* StaticBitmap_Show;
-		wxStaticText* StaticText15;
-		wxStaticText* StaticText12;
-		wxStaticText* StaticText_Interval;
+		wxPanel* Panel1;
+		wxRadioButton* RadioButton_AsfShadow;
+		wxRadioButton* RadioButton_MpcShadow;
 		wxRadioButton* RadioButton_NoShadow;
+		wxScrolledWindow* ScrolledWindow_BmpShow;
 		wxScrolledWindow* ScrolledWindow_Setting;
-		wxSpinCtrl* SpinCtrl_GlobalHeight;
-		wxStaticText* StaticText_CurrentFile;
-		wxSpinCtrl* SpinCtrl_Frame_Goto;
-		wxStaticText* StaticText25;
-		wxStaticLine* StaticLine11;
-		wxStaticText* StaticText17;
-		wxStaticText* StaticText4;
-		wxSpinCtrl* SpinCtrl_GlobalWidth;
-		wxStaticText* StaticText_Frame_Cur;
-		wxSpinCtrl* SpinCtrl_Left;
-		wxStaticText* StaticText16;
-		wxStaticLine* StaticLine5;
+		wxSlider* Slider_Frame;
+		wxSlider* Slider_Interval;
+		wxSpinCtrl* SpinCtrl_AlphaMask;
+		wxSpinCtrl* SpinCtrl_Bottom;
 		wxSpinCtrl* SpinCtrl_Direction;
+		wxSpinCtrl* SpinCtrl_Frame_Goto;
+		wxSpinCtrl* SpinCtrl_GlobalHeight;
+		wxSpinCtrl* SpinCtrl_GlobalWidth;
+		wxSpinCtrl* SpinCtrl_Left;
+		wxSpinCtrl* SpinCtrl_PicOffX;
+		wxSpinCtrl* SpinCtrl_PicOffY;
+		wxSpinCtrl* SpinCtrl_ShadowAlpha;
+		wxSpinCtrl* SpinCtrl_ShadowX;
+		wxSpinCtrl* SpinCtrl_ShadowY;
+		wxSpinCtrl* SpinCtrl_SunX;
+		wxSpinCtrl* SpinCtrl_SunY;
+		wxStaticBitmap* StaticBitmap_Show;
+		wxStaticLine* StaticLine10;
+		wxStaticLine* StaticLine11;
+		wxStaticLine* StaticLine12;
+		wxStaticLine* StaticLine1;
+		wxStaticLine* StaticLine2;
+		wxStaticLine* StaticLine3;
+		wxStaticLine* StaticLine4;
+		wxStaticLine* StaticLine5;
+		wxStaticLine* StaticLine6;
+		wxStaticLine* StaticLine7;
+		wxStaticLine* StaticLine8;
+		wxStaticLine* StaticLine9;
+		wxStaticText* StaticText10;
+		wxStaticText* StaticText11;
+		wxStaticText* StaticText12;
+		wxStaticText* StaticText13;
+		wxStaticText* StaticText14;
+		wxStaticText* StaticText15;
+		wxStaticText* StaticText16;
+		wxStaticText* StaticText17;
+		wxStaticText* StaticText18;
+		wxStaticText* StaticText19;
+		wxStaticText* StaticText1;
+		wxStaticText* StaticText20;
+		wxStaticText* StaticText21;
+		wxStaticText* StaticText22;
+		wxStaticText* StaticText23;
+		wxStaticText* StaticText24;
+		wxStaticText* StaticText25;
+		wxStaticText* StaticText26;
+		wxStaticText* StaticText27;
+		wxStaticText* StaticText2;
+		wxStaticText* StaticText3;
+		wxStaticText* StaticText4;
+		wxStaticText* StaticText5;
+		wxStaticText* StaticText6;
+		wxStaticText* StaticText7;
+		wxStaticText* StaticText8;
+		wxStaticText* StaticText9;
+		wxStaticText* StaticText_CurrentFile;
+		wxStaticText* StaticText_Frame_Cur;
+		wxStaticText* StaticText_Frame_Sum;
+		wxStaticText* StaticText_Interval;
 		//*)
 
 	protected:
@@ -232,6 +232,7 @@ class MpcAsfTool: public wxFrame
 		void OnButton_AnimateClick(wxCommandEvent& event);
 		void OnButton_AdjustPositionClick(wxCommandEvent& event);
 		void OnCheckBox_LockPicOffsetClick(wxCommandEvent& event);
+		void OnExportToTga(wxCommandEvent &event);
 		//*)
 
 		DECLARE_EVENT_TABLE()
@@ -264,9 +265,12 @@ class MpcAsfTool: public wxFrame
 
 		bool OpenFile(const wxString path);
 
+
 		//let SpinCtril update value when renewfocus
         void ReNewFocus();
         bool ChangeSaved();
+
+
 
     private:
         void ReNew();
@@ -294,6 +298,8 @@ class MpcAsfTool: public wxFrame
         {
             ID_EXPORT_TO_GIF = 10000,
             ID_EXPORT_TO_PNG,
+			ID_EXPORT_TO_TGA,//  [新增] 加入一个导出TGA的ID
+			ID_TGA_TO_SPR,//  [新增] 加入一个导出SPR的ID
             ID_FRAME_PREVIOUS,
             ID_FRAME_NEXT,
             ID_RESIZE,
@@ -344,7 +350,7 @@ public:
 	FileExplorerPanel(wxWindow *parent)
 		:FileExplorerPanelBase(parent)
 	{
-		SetTitle(wxT("�ļ����"));
+		SetTitle(wxT("文件浏览"));
 		m_genericDirCtrl1->SetFilter(wxT("ALL|*.*|MPC ASF SPR RPC(*.mpc,*.asf,*.spr,*.rpc)|*.mpc;*.asf;*.spr;*.rpc|MPC(*.mpc)|*.mpc|ASF(*.asf)|*.asf|SPR(*.spr)|*.spr|RPC(*.rpc)|*.rpc"));
 		m_genericDirCtrl1->SetFilterIndex(1);
 		m_parent = (MpcAsfTool*)parent;
