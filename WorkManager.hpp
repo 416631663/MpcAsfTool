@@ -1,178 +1,1193 @@
-#ifndef WORKMANAGER_HPP_INCLUDED
-#define WORKMANAGER_HPP_INCLUDED
+#include "WorkManager.hpp"
+#include "GifData.hpp"
+#include "wx/filename.h"
+#include "RpcDecode.hpp"
+#include <fstream>
 
-#include "wx/image.h"
-
-#include "MAPICDATA.hpp"
-#include "MpcDecode.hpp"
-#include "MpctoPic.hpp"
-#include "AsfDecode.hpp"
-#include "AsftoPic.hpp"
-#include "ShdDecode.hpp"
-#include "SprDecode.hpp"
-
-class WorkManager
+///////////////
+//public
+//////////////
+wxArrayString WorkManager::AddFiles(const wxArrayString& files)
 {
-public:
-    WorkManager(){Init();}
-    WorkManager(long Width, long Height, long Direction, long Bottom, long Left, unsigned long Interval, bool ShdIncluded,
-                bool MakeShadow, SHD_TYPE ShdType, long Sunx, long Suny, long Shdx, long Shdy, wxColor Basecol,
-                unsigned char AlphaMask, unsigned char ShadowAlpha,long PicOffX, long PicOffY)
+    if(files.IsEmpty())return wxArrayString();
+
+    wxArrayString failedfiles;
+    FREE_IMAGE_FORMAT filetype = FIF_UNKNOWN;
+    FIMULTIBITMAP *multipic = NULL;
+    FIBITMAP *singlepic = NULL, *bmp32;
+    unsigned tempwidth, tempheight;
+    unsigned long temppos;
+    FILOCRGBQUAD *buffer = NULL;
+    BYTE *data;
+
+    for(size_t i = 0; i < files.GetCount(); i++)
     {
-        Init(Width, Height, Direction, Bottom, Left, Interval, ShdIncluded,
-             MakeShadow, ShdType, Sunx, Suny, Shdx, Shdy, Basecol, AlphaMask, ShadowAlpha, PicOffX, PicOffY);
+        filetype = FreeImage_GetFileType(files[i].char_str(), 0);
+        if(filetype == FIF_UNKNOWN)
+        {
+            filetype = FreeImage_GetFIFFromFilename(files[i].char_str());
+        }
+
+        if(filetype != FIF_UNKNOWN && FreeImage_FIFSupportsReading(filetype))
+        {
+            if(filetype == FIF_ICO || filetype == FIF_TIFF ||filetype == FIF_GIF)//multi-page
+            {
+                multipic = FreeImage_OpenMultiBitmap(filetype, files[i].char_str(), FALSE, TRUE, FALSE, 0);
+                if(multipic)
+                {
+                    for(int mlti = 0; mlti < FreeImage_GetPageCount(multipic); mlti++)
+                    {
+                        singlepic = FreeImage_LockPage(multipic, mlti);
+                        if(singlepic)
+                        {
+                            bmp32 = FreeImage_ConvertTo32Bits(singlepic);
+                            if(bmp32)
+                            {
+                                tempwidth = FreeImage_GetWidth(bmp32);
+                                tempheight = FreeImage_GetHeight(bmp32);
+                                buffer = new FILOCRGBQUAD[tempwidth*tempheight];
+                                data = (BYTE*)malloc(tempwidth*tempheight*4);
+
+                                if(totalframecounts == 0)
+                               {
+                                    SetGlobalWidth((long)tempwidth);
+                                    SetGlobalHeight((long)tempheight);
+                                }
+
+                                if(buffer != NULL && data != NULL)
+                                {
+                                    FreeImage_ConvertToRawBits(data, bmp32, tempwidth*4, 32, FI_RGBA_RED_MASK,
+                                                               FI_RGBA_GREEN_MASK, FI_RGBA_BLUE_MASK,TRUE);
+
+                                    temppos = 0;
+                                    for(unsigned long pixi = 0; pixi < tempwidth*tempheight; pixi++)
+                                    {
+                                        buffer[pixi].rgbBlue = data[temppos++];
+                                        buffer[pixi].rgbGreen = data[temppos++];
+                                        buffer[pixi].rgbRed = data[temppos++];
+                                        buffer[pixi].rgbReserved = data[temppos++];
+                                    }
+                                    AddFrame(buffer, tempwidth, tempheight);
+                                }
+                                else
+                                {
+                                    failedfiles.Add(files[i]);
+                                    FreeImage_Unload(bmp32);
+                                    FreeImage_UnlockPage(multipic, singlepic, FALSE);
+                                    if(buffer) delete[] buffer;
+                                    if(data) free(data);
+                                    break;
+                                }
+
+                                FreeImage_Unload(bmp32);
+                            }
+                            else
+                            {
+                                failedfiles.Add(files[i]);
+                                FreeImage_UnlockPage(multipic, singlepic, FALSE);
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            failedfiles.Add(files[i]);
+                            break;
+                        }
+                    }
+
+                    FreeImage_CloseMultiBitmap(multipic, 0);
+                    multipic = NULL;
+                }
+                else
+                {
+                    failedfiles.Add(files[i]);
+                }
+            }
+            else //single-page
+            {
+                singlepic = FreeImage_LoadU(filetype, files[i], 0);
+                if(singlepic)
+                {
+                    bmp32 = FreeImage_ConvertTo32Bits(singlepic);
+                    FreeImage_Unload(singlepic);
+
+                    if(bmp32)
+                    {
+                        tempwidth = FreeImage_GetWidth(bmp32);
+                        tempheight = FreeImage_GetHeight(bmp32);
+                        buffer = new FILOCRGBQUAD[tempwidth*tempheight];
+                        data = (BYTE*)malloc(tempwidth*tempheight*4);
+
+                        if(totalframecounts == 0)
+                       {
+                            SetGlobalWidth((long)tempwidth);
+                            SetGlobalHeight((long)tempheight);
+                        }
+
+                        if(buffer != NULL && data != NULL)
+                        {
+                            FreeImage_ConvertToRawBits(data, bmp32, tempwidth*4, 32, FI_RGBA_RED_MASK,
+                                                       FI_RGBA_GREEN_MASK, FI_RGBA_BLUE_MASK,TRUE);
+
+                            temppos = 0;
+                            for(unsigned long pixi = 0; pixi < tempwidth*tempheight; pixi++)
+                            {
+                                buffer[pixi].rgbBlue = data[temppos++];
+                                buffer[pixi].rgbGreen = data[temppos++];
+                                buffer[pixi].rgbRed = data[temppos++];
+                                buffer[pixi].rgbReserved = data[temppos++];
+                            }
+                            AddFrame(buffer, tempwidth, tempheight);
+                        }
+                        else
+                        {
+                            failedfiles.Add(files[i]);
+                            if(buffer) delete[] buffer;
+                            if(data) free(data);
+                        }
+
+                        FreeImage_Unload(bmp32);
+                    }
+                    else
+                    {
+                        failedfiles.Add(files[i]);
+                    }
+
+                }
+                else
+                {
+                    failedfiles.Add(files[i]);
+                }
+            }
+        }
+        else
+        {
+            if(sprdecode.ReadSprFile(files[i]))
+            {
+            	tempwidth = sprdecode.GetGlobleWidth();
+            	tempheight = sprdecode.GetGlobleHeight();
+            	int width, height,offx, offy;
+                for(unsigned long i = 0; i < sprdecode.GetFramesCounts(); i++)
+                {
+                    buffer = sprdecode.GetFIDecodedFrameData(i, width, height, offx, offy);
+                    if(buffer)
+                    {
+                        if(totalframecounts == 0)
+                        {
+                            SetGlobalWidth((long)width);
+                            SetGlobalHeight((long)height);
+                        }
+
+                        AddFrame(buffer, width, height, NULL, true, offx, offy);
+                    }
+                    else
+                    {
+                        failedfiles.Add(files[i]);
+                        break;
+                    }
+                }
+            }
+            else failedfiles.Add(files[i]);
+        }
     }
-    ~WorkManager(){FreeRGBAData();}
-    void Init()
+
+    return failedfiles;
+}
+bool WorkManager::OpenFile(wxString InPath, int frameBegin, int frameEnd )
+{
+    if(InPath.IsEmpty()) return false;
+    wxString ext;
+    long tempwidth, tempheight;
+    FILOCRGBQUAD *tempdata, *tempshddata;
+
+    ext = wxFileName::FileName(InPath).GetExt();
+
+    if(ext.CmpNoCase(wxT("mpc")) == 0)
     {
-        globalwidth = 1; globalheight = 1; direction = 1; bottom = 0;
-        left = 0; interval = 100; shdincluded = false; makeshadow = false; shdtype = SHD_MPC;
-        globalsunoffx = 0; globalsunoffy = 0; globalshadowoffx = 0; globalshadowoffy = 0;
-        basecolor = *wxWHITE; firstframe = NULL; currentframe = NULL;
-        totalframecounts = 0;framecounts = 0;alphamask = 0; shadowalpha = 0x78;
-        picoffx = 0; picoffy = 0;
+        wxString shdpath;
+        bool hasshd = false;
+
+        if(!mpcdecode.ReadMpcFile(InPath)) return false;
+
+        shdpath = wxFileName::FileName(InPath).GetPath(wxPATH_GET_SEPARATOR|wxPATH_GET_VOLUME);
+        shdpath += wxFileName::FileName(InPath).GetName();
+        shdpath += wxT(".shd");
+
+        tempwidth = mpcdecode.GetGlobleWidth();
+        tempheight = mpcdecode.GetGlobleHeight();
+        SetGlobalWidth(tempwidth);
+        SetGlobalHeight(tempheight);
+        SetDirection(mpcdecode.GetDirection());
+        SetBottom(mpcdecode.GetBottom());
+        SetInterval(mpcdecode.GetInterval());
+
+        if(wxFileName::FileExists(shdpath))
+        {
+            if(shddecode.ReadShdFile(shdpath))
+            {
+                if(shddecode.GetGlobleWidth() == tempwidth &&
+                        shddecode.GetGlobleHeight() == tempheight)
+                {
+                    hasshd = true;
+                }
+            }
+        }
+
+        tempshddata = NULL;
+        for(unsigned long conti = frameBegin; conti < mpcdecode.GetFramesCounts() && ((int)conti) <= frameEnd; conti++)
+        {
+            tempdata = mpcdecode.GetGlobleFIDecodedFrameData(conti, NULL, NULL, MpcDecode::PIC_BGRA);
+            if(!tempdata) return false;
+            if(hasshd)
+            {
+                tempshddata = shddecode.GetGlobleFIDecodedFrameData(conti, NULL, NULL, ShdDecode::PIC_BGRA);
+            }
+            AddFrame(tempdata, tempwidth, tempheight, tempshddata);
+        }
     }
-    void Init(long Width, long Height, long Direction, long Bottom, long Left, unsigned long Interval, bool ShdIncluded,
-                bool MakeShadow, SHD_TYPE ShdType, long Sunx, long Suny, long Shdx, long Shdy,
-                wxColor Basecol, unsigned char AlphaMask, unsigned char ShadowAlpha,long PicOffX, long PicOffY)
+    else if(ext.CmpNoCase(wxT("asf")) == 0)
     {
-        Init();
-        globalwidth = Width; globalheight = Height; direction = Direction; bottom = Bottom;
-        left = Left; interval = Interval; shdincluded = ShdIncluded; makeshadow = MakeShadow; shdtype = ShdType;
-        globalsunoffx = Sunx; globalsunoffy = Suny; globalshadowoffx = Shdx; globalshadowoffy = Shdy;
-        basecolor = Basecol; alphamask = AlphaMask; shadowalpha = ShadowAlpha; picoffx = PicOffX; picoffy = PicOffY;
+        asfdecode.ReadAsfFile(InPath);
+
+        if(!asfdecode.ReadAsfFile(InPath)) return false;
+
+        tempwidth = asfdecode.GetGlobleWidth();
+        tempheight  = asfdecode.GetGlobleHeight();
+        SetGlobalWidth(tempwidth);
+        SetGlobalHeight(tempheight);
+        SetDirection(asfdecode.GetDirection());
+        SetBottom(asfdecode.GetBottom());
+        SetInterval(asfdecode.GetInterval());
+        SetLeft(asfdecode.GetLeft());
+
+        for(unsigned long conti = frameBegin; conti < asfdecode.GetFramesCounts() && ((int)conti) <= frameEnd; conti++)
+        {
+            tempdata = asfdecode.GetGlobleFIDecodedFrameData(conti, NULL, NULL, AsfDecode::PIC_BGRA);
+            if(!tempdata) return false;
+            AddFrame(tempdata, tempwidth, tempheight);
+        }
+    }
+    else if(ext.CmpNoCase(wxT("rpc")) == 0)
+    {
+        RpcDecode decode;
+        if(decode.ReadFile(InPath))
+        {
+            tempwidth = decode.GetGlobleWidth();
+            tempheight = decode.GetGlobleHeight();
+            SetGlobalWidth(tempwidth);
+            SetGlobalHeight(tempheight);
+            SetDirection(decode.GetDirection());
+            SetBottom(decode.GetBottom());
+            SetInterval(decode.GetInterval());
+
+            for(unsigned long conti = frameBegin; conti < decode.GetFramesCounts() && ((int)conti) <= frameEnd; conti++)
+            {
+                tempdata = decode.GetFIDecodedFrameData(conti);
+                if(!tempdata) return false;
+                AddFrame(tempdata, tempwidth, tempheight);
+            }
+        }
+        else return false;
+    }
+    else if(ext.CmpNoCase(wxT("spr")) == 0)
+    {
+        if(sprdecode.ReadSprFile(InPath))
+        {
+            tempwidth = sprdecode.GetGlobleWidth();
+            tempheight  = sprdecode.GetGlobleHeight();
+            SetGlobalWidth(tempwidth);
+            SetGlobalHeight(tempheight);
+            SetDirection(sprdecode.GetDirection());
+            SetInterval(sprdecode.GetInterval());
+            SetBottom(sprdecode.GetBottom());
+            SetLeft(sprdecode.GetLeft());
+
+			int width, height,offx, offy;
+            for(unsigned long conti = frameBegin; conti < sprdecode.GetFramesCounts() && ((int)conti) <= frameEnd; conti++)
+            {
+                tempdata = sprdecode.GetFIDecodedFrameData(conti, width, height, offx, offy);
+                if(!tempdata) return false;
+                AddFrame(tempdata, width, height, NULL, true, offx, offy);
+            }
+        }
+        else
+            return false;
+    }
+    else
+	{
+		return false;
+	}
+
+    return true;
+}
+bool WorkManager::AddFrame(FILOCRGBQUAD *frame, long width, long height, FILOCRGBQUAD *shddata,
+				bool isOffsetLocked, int offx, int offy)
+{
+    if(frame == NULL || width < 1 || height < 1) return false;
+
+    if(totalframecounts == 0)
+    {
+        firstframe = new FRAMERGBA();
+        currentframe = firstframe;
+    }
+    else
+    {
+        currentframe->next = new FRAMERGBA();
+        currentframe = currentframe->next;
     }
 
-    //delete internal data, get a empty object
-    void ReNew(){FreeRGBAData();Init();}
+    if(currentframe)
+	{
+		currentframe->data = frame;
+        currentframe->shddata = shddata;
+        currentframe->next = NULL;
+        currentframe->width = width;
+        currentframe->height = height;
+        currentframe->islocked = false;
+        currentframe->isdeleted = false;
+        if(isOffsetLocked)
+		{
+			currentframe->ispicoffsetlocked = true;
+			currentframe->picoffx = offx;
+			currentframe->picoffy = offy;
+		}
+	}
 
-    //return failed file
-    wxArrayString AddFiles(const wxArrayString& files);
+    totalframecounts++;
+    framecounts++;
 
-    //open mpc asf file
-    bool OpenFile(wxString InPath, int frameBegin = 0, int frameEnd = 99999999);
+    return true;
+}
+//set frame local info
+bool WorkManager::SetUndeletedFrame(unsigned long index, bool isLock, long Sunx, long Suny, long Shdx, long Shdy)
+{
+    FRAMERGBA *temp;
+
+    temp = GetUndeletedFrameData(index);
+    if(temp == NULL) return false;
+
+    temp->islocked = isLock;
+    temp->sunoffx = Sunx;
+    temp->sunoffy = Suny;
+    temp->shadowoffx = Shdx;
+    temp->shadowoffy = Shdy;
+
+    return true;
+}
+bool WorkManager::DeleteFrame(unsigned long index)
+{
+    FRAMERGBA *temp;
+    unsigned long relpos;
+
+    temp = GetUndeletedFrameData(index, &relpos);
+    if(temp == NULL) return false;
+
+    temp->isdeleted = true;
+
+    framecounts--;
+    deletedframe.Add(relpos);
+
+    return true;
+}
+
+//undelete last deleted frame
+bool WorkManager::UnDeleteFrame()
+{
+    if(deletedframe.IsEmpty()) return false;
+
+    FRAMERGBA *temp;
+
+    temp = GetFrameData(deletedframe[deletedframe.GetCount()-1]);
+    if(temp == NULL) return false;
+
+    temp->isdeleted = false;
+
+    framecounts++;
+    deletedframe.RemoveAt(deletedframe.GetCount()-1);
+
+    return true;
+}
+
+//All frames included, include deleted frame
+FRAMERGBA* WorkManager::GetFrameData(unsigned long index)
+{
+    if(index >= totalframecounts) return NULL;
+
+    FRAMERGBA *temp;
+
+    temp = firstframe;
+
+    for(unsigned long i = 0; i < index; i++)
+    {
+        temp = temp->next;
+    }
+
+    return temp;
+}
+
+//get internal frame data, frame marked deleted is excluded, don't delete[] it
+FRAMERGBA* WorkManager::GetUndeletedFrameData(unsigned long index, unsigned long *RealIndex)
+{
+    if(index >= framecounts) return NULL;
+
+    FRAMERGBA *temp;
+    unsigned long relpos = 0;
+
+    temp = firstframe;
+
+    //get first undeleted frame
+    for(unsigned long ui = 0; ui < totalframecounts; ui++)
+    {
+        if(temp->isdeleted)
+        {
+            temp = temp->next;
+            relpos++;
+        }
+        else break;
+    }
+
+    for(unsigned long gi = 0; gi != index; )
+    {
+        if(temp->isdeleted)
+        {
+            temp = temp->next;
+            relpos++;
+        }
+        else
+        {
+            temp = temp->next;
+            relpos++;
+            gi++;
+        }
+    }
+
+    //last one may deleted
+    for(unsigned long ui = 0; ui < totalframecounts; ui++)
+    {
+        if(temp->isdeleted)
+        {
+            temp = temp->next;
+            relpos++;
+        }
+        else break;
+    }
+
+    if(RealIndex != NULL) *RealIndex = relpos;
+
+    return temp;
+}
+bool WorkManager::IsUndeletedFrameLocked(unsigned long index)
+{
+    FRAMERGBA *temp;
+
+    temp = GetUndeletedFrameData(index);
+    if(temp == NULL) return false;
+
+    return temp->islocked;
+}
+//get width height globalize data, return data must be delete[] if unneeded
+FILOCRGBQUAD* WorkManager::GetUndeletedGlobalizedFrameData(unsigned long index)
+{
+    FRAMERGBA *temp;
+
+    temp = GetUndeletedFrameData(index);
+    if(temp == NULL) return NULL;
 
 
+    unsigned long glbdatalen;
+    long width,height,offwidth,offheight;
+    FILOCRGBQUAD *decdata, *glbdata;
 
-    bool AddFrame(FILOCRGBQUAD *frame, long width, long height, FILOCRGBQUAD *shddata = NULL,
-				bool isOffsetLocked = false, int offx = 0, int offy = 0);
+    width = temp->width;
+    height = temp->height;
+    decdata = temp->data;
+    glbdatalen = (unsigned long)GetGlobalWidth()*GetGlobalHeight();
+    glbdata = new FILOCRGBQUAD[(size_t)glbdatalen];
+    long offx = GetPicOffX();
+    long offy = GetPicOffY();
+    if(temp->ispicoffsetlocked)
+	{
+		offx = temp->picoffx;
+		offy = temp->picoffy;
+	}
 
-    //set frame local info,frame marked deleted is excluded
-    bool SetUndeletedFrame(unsigned long index, bool isLock = true,
-                  long Sunx = 0 , long Suny = 0, long Shdx = 0, long Shdy = 0);
+    if(!glbdata)
+    {
+        return NULL;
+    }
 
-    bool DeleteFrame(unsigned long index);
+    //inital
+    for(long datidx = 0; datidx < (long)glbdatalen; datidx++)
+    {
+        glbdata[datidx].rgbRed = 0xFF;
+        glbdata[datidx].rgbGreen = 0xFF;
+        glbdata[datidx].rgbBlue = 0xFF;
+        glbdata[datidx].rgbReserved = 0x00;
+    }
+    //assign
+    for(long hi = 0; hi < GetGlobalHeight(); hi++)
+    {
+        for(long wi = 0; wi < GetGlobalWidth(); wi++)
+        {
+            offwidth = wi + offx;
+            offheight = hi + offy;
+            if(hi < height && wi < width &&
+                    offwidth >= 0 && offwidth < GetGlobalWidth() &&
+                    offheight >= 0 && offheight < GetGlobalHeight())
+            {
+                glbdata[offheight*GetGlobalWidth()+offwidth].rgbRed = decdata[hi*width+wi].rgbRed;
+                glbdata[offheight*GetGlobalWidth()+offwidth].rgbGreen = decdata[hi*width+wi].rgbGreen;
+                glbdata[offheight*GetGlobalWidth()+offwidth].rgbBlue = decdata[hi*width+wi].rgbBlue;
+                glbdata[offheight*GetGlobalWidth()+offwidth].rgbReserved = decdata[hi*width+wi].rgbReserved;
+            }
+        }
+    }
 
-    //undelete last deleted frame
-    bool UnDeleteFrame();
+    return glbdata;
+}
+FILOCRGBQUAD* WorkManager::GetUndeletedGlobalizedShdFrameData(unsigned long index)
+{
+    FRAMERGBA *temp;
 
-    //All frames included, include deleted frame
-    FRAMERGBA* GetFrameData(unsigned long index);
-
-    //get internal frame data, frame marked deleted is excluded, don't delete[] it
-    FRAMERGBA* GetUndeletedFrameData(unsigned long index, unsigned long *RealIndex = NULL);
-
-    bool IsUndeletedFrameLocked(unsigned long index);
-
-    //get width height globalize data, return data must be delete[] if unneeded
-    FILOCRGBQUAD* GetUndeletedGlobalizedFrameData(unsigned long index);
-    FILOCRGBQUAD* GetUndeletedGlobalizedShdFrameData(unsigned long index);
-
-    wxImage GetUndeletedGlobalizedImage(unsigned long index, bool AssiLine = false);
-
-    void SetGlobalWidth(long width){globalwidth = width;}
-    void SetGlobalHeight(long height){globalheight = height;}
-    void SetDirection(long Direction){direction = Direction;}
-    void SetBottom(long Bottom){bottom = Bottom;}
-    void SetLeft(long Left){left = Left;}
-    void SetInterval(unsigned long Interval){interval = Interval;}
-    void SetPicOffX(long PicOffX){picoffx = PicOffX;}
-    void SetPicOffY(long PicOffY){picoffy = PicOffY;}
-    void SetShdIncluded(bool ShdIncluded){shdincluded = ShdIncluded;}
-    void SetMakeShadow(bool IsMake, SHD_TYPE type = SHD_MPC){makeshadow = IsMake; shdtype = type;}
-    void SetGlobalSunx(long Sunx){globalsunoffx = Sunx;}
-    void SetGlobalSuny(long Suny){globalsunoffy = Suny;}
-    void SetGlobalShadowx(long Shdx){globalshadowoffx = Shdx;}
-    void SetGlobalShadowy(long Shdy){globalshadowoffy = Shdy;}
-    void SetBaseColor(wxColor Base){basecolor = Base;}
-    void SetAlphaMask(unsigned char AlphaMask){alphamask = AlphaMask;}
-    void SetShadowAlpha(unsigned char ShadowAlpha){shadowalpha = ShadowAlpha;}
-    bool SetFrameLock(unsigned long index, bool locked = true);
-    bool SetFrameSunX(unsigned long index, long Sunx);
-    bool SetFrameSunY(unsigned long index, long Suny);
-    bool SetFrameShadowX(unsigned long index, long ShadowX);
-    bool SetFrameShadowY(unsigned long index, long ShadowY);
-
-    long GetGlobalWidth(){return globalwidth;}
-    long GetGlobalHeight(){return globalheight;}
-    long GetDirection(){return direction;}
-    long GetBottom(){return bottom;}
-    long GetLeft(){return left;}
-    unsigned long GetInterval(){return interval;}
-    long GetPicOffX(){return picoffx;}
-    long GetPicOffY(){return picoffy;}
-    bool IsShdIncluded(){return shdincluded;}
-    bool IsMakeShadow(){return makeshadow;}
-    SHD_TYPE GetShadowType(){return shdtype;}
-    long GetGlobalSunx(){return globalsunoffx;}
-    long GetGlobalSuny(){return globalsunoffy;}
-    long GetGlobalShadowx(){return globalshadowoffx;}
-    long GetGlobalShadowy(){return globalshadowoffy;}
-    wxColor GetBaseColor(){return basecolor;}
-    unsigned char GetAlphaMask(){return alphamask;}
-    unsigned char GetShadowAlpha(){return shadowalpha;}
-    unsigned long GetFrameCounts(){return framecounts;}
-    bool IsFrameLocked(unsigned long index);
-    long GetFrameSunX(unsigned long index);
-    long GetFrameSunY(unsigned long index);
-    long GetFrameShadowX(unsigned long index);
-    long GetFrameShadowY(unsigned long index);
-
-	bool SaveToMpc(const wxString outpath);
-    bool SaveToMpc(const wxString outpath, int decodeType);
-    bool SaveToAsf(const wxString outpath);
-    bool SaveToGif(const wxString outpath);
-    bool SaveToPng(const wxString outpath, bool reverseFrames = false);
-
-protected:
-private:
-    void FreeRGBAData();
-
-    void AddBaseColor(FILOCRGBQUAD *inout, long width, long heigh);
+    temp = GetUndeletedFrameData(index);
+    if(temp == NULL) return NULL;
+    if(temp->shddata == NULL) return NULL;
 
 
-    MpcDecode mpcdecode;
-    AsfDecode asfdecode;
-    ShdDecode shddecode;
-    SprDecode sprdecode;
+    unsigned long glbdatalen;
+    long width,height,offwidth,offheight;
+    FILOCRGBQUAD *decdata, *glbdata;
 
-    FRAMERGBA *firstframe, *currentframe;
-    unsigned long framecounts;//not included deleted
-    unsigned long totalframecounts;//included deleted
-    wxArrayLong deletedframe;
+    width = temp->width;
+    height = temp->height;
+    decdata = temp->shddata;
+    glbdatalen = (unsigned long)GetGlobalWidth()*GetGlobalHeight();
+    glbdata = new FILOCRGBQUAD[(size_t)glbdatalen];
+    long offx = GetPicOffX();
+    long offy = GetPicOffY();
+    if(temp->ispicoffsetlocked)
+	{
+		offx = temp->picoffx;
+		offy = temp->picoffy;
+	}
 
-    long globalwidth;
-    long globalheight;
-    long direction;
-    long bottom;
-    long left;
-    unsigned long interval;
-    long picoffx;
-    long picoffy;
+    if(!glbdata)
+    {
+        return NULL;
+    }
 
-    bool shdincluded;
-    bool makeshadow;
-    SHD_TYPE shdtype;
-    long globalsunoffx;
-    long globalsunoffy;
-    long globalshadowoffx;
-    long globalshadowoffy;
+    //inital
+    for(long datidx = 0; datidx < (long)glbdatalen; datidx++)
+    {
+        glbdata[datidx].rgbRed = 0xFF;
+        glbdata[datidx].rgbGreen = 0xFF;
+        glbdata[datidx].rgbBlue = 0xFF;
+        glbdata[datidx].rgbReserved = 0x00;
+    }
+    //assign
+    for(long hi = 0; hi < GetGlobalHeight(); hi++)
+    {
+        for(long wi = 0; wi < GetGlobalWidth(); wi++)
+        {
+            offwidth = wi + offx;
+            offheight = hi + offy;
+            if(hi < height && wi < width &&
+                    offwidth >= 0 && offwidth < GetGlobalWidth() &&
+                    offheight >= 0 && offheight < GetGlobalHeight())
+            {
+                glbdata[offheight*GetGlobalWidth()+offwidth].rgbRed = decdata[hi*width+wi].rgbRed;
+                glbdata[offheight*GetGlobalWidth()+offwidth].rgbGreen = decdata[hi*width+wi].rgbGreen;
+                glbdata[offheight*GetGlobalWidth()+offwidth].rgbBlue = decdata[hi*width+wi].rgbBlue;
+                glbdata[offheight*GetGlobalWidth()+offwidth].rgbReserved = decdata[hi*width+wi].rgbReserved;
+            }
+        }
+    }
 
-    unsigned char alphamask;
-    unsigned char shadowalpha;
+    return glbdata;
+}
+wxImage WorkManager::GetUndeletedGlobalizedImage(unsigned long index, bool AssiLine)
+{
+    MAPICDATA proc(GetGlobalWidth(), GetGlobalHeight());
+    FILOCRGBQUAD *frame, *shdframe;
+    FRAMERGBA *tempframe;
+    unsigned char *rgbdata;
+    long tsunx, tsuny, tshdx, tshdy;
 
-    wxColor basecolor;
-};
+    frame = GetUndeletedGlobalizedFrameData(index);
+    if(frame == NULL) return wxNullImage;
 
+    if(alphamask != 0)
+    {
+        MAPICDATA::MakeTransMask(frame, GetGlobalWidth(), GetGlobalHeight(), alphamask);
+    }
 
-#endif // WORKMANAGER_HPP_INCLUDED
+    if(shdincluded && !makeshadow)
+    {
+        shdframe = GetUndeletedGlobalizedShdFrameData(index);
+        if(shdframe != NULL)
+        {
+            for(long pixi = 0; pixi < GetGlobalWidth()*GetGlobalHeight(); pixi++)
+            {
+                if(frame[pixi].rgbReserved != 0)
+                {
+                    shdframe[pixi].rgbBlue = frame[pixi].rgbBlue;
+                    shdframe[pixi].rgbGreen = frame[pixi].rgbGreen;
+                    shdframe[pixi].rgbRed = frame[pixi].rgbRed;
+                    shdframe[pixi].rgbReserved = frame[pixi].rgbReserved;
+                }
+            }
+            delete[] frame;
+            frame = shdframe;
+        }
+    }
+
+    proc.AddFrame(frame);
+
+    tempframe = GetUndeletedFrameData(index);
+    if(tempframe == NULL) return wxNullImage;
+
+    if(tempframe->islocked)
+    {
+        tsunx = tempframe->sunoffx;
+        tsuny = tempframe->sunoffy;
+        tshdx = tempframe->shadowoffx;
+        tshdy = tempframe->shadowoffy;
+    }
+    else
+    {
+        tsunx = globalsunoffx;
+        tsuny = globalsunoffy;
+        tshdx = globalshadowoffx;
+        tshdy = globalshadowoffy;
+    }
+
+    if(makeshadow)
+    {
+        if(!proc.MakeShadow(shdtype, NULL, tsunx,tsuny,
+                            tshdx, tshdy, shadowalpha))
+        {
+            return wxNullImage;
+        }
+    }
+
+    if(AssiLine)
+    {
+        proc.AddAssiLine();
+    }
+
+    rgbdata = proc.GetFrameRGB(0, basecolor);
+    if(rgbdata == NULL) return wxNullImage;
+
+    wxImage img(GetGlobalWidth(), GetGlobalHeight(), rgbdata);
+    return img;
+}
+bool WorkManager::SaveToMpc(const wxString outpath)
+{
+	return SaveToMpc(outpath, mpcdecode.DecodeType);
+}
+bool WorkManager::SaveToMpc(const wxString outpath, int decodeType)
+{
+    MAPICDATA proc(GetGlobalWidth(), GetGlobalHeight());
+    MAPICDATA shdproc(GetGlobalWidth(), GetGlobalHeight()), tempshd;
+    FILOCRGBQUAD *tempfrmdata, *tempshddata, bscol;
+    FRAMERGBA *tempframe;
+    long tsunx, tsuny, tshdx, tshdy;
+
+    bscol.rgbRed = (BYTE)basecolor.Red();
+    bscol.rgbGreen = (BYTE)basecolor.Green();
+    bscol.rgbBlue = (BYTE)basecolor.Blue();
+    bscol.rgbReserved = 0xFF;
+
+    for(unsigned long frmi = 0; frmi < framecounts; frmi++)
+    {
+        tempfrmdata = GetUndeletedGlobalizedFrameData(frmi);
+        if(tempfrmdata == NULL) return false;
+
+        if(alphamask != 0)
+        {
+            MAPICDATA::MakeTransMask(tempfrmdata, GetGlobalWidth(), GetGlobalHeight(), alphamask);
+        }
+
+        proc.AddFrame(tempfrmdata);
+    }
+
+	if(decodeType == 0)
+	{
+		proc.AddBaseColor(bscol);
+	}
+
+    if(!proc.SaveToMpc(outpath, direction, interval, bottom, false, decodeType)) return false;
+
+    if(makeshadow)
+    {
+        for(unsigned long frmi = 0; frmi < framecounts; frmi++)
+        {
+            tempfrmdata = GetUndeletedGlobalizedFrameData(frmi);
+            if(tempfrmdata == NULL) return false;
+
+            if(alphamask != 0)
+            {
+                MAPICDATA::MakeTransMask(tempfrmdata, GetGlobalWidth(), GetGlobalHeight(), alphamask);
+            }
+
+            tempframe = GetUndeletedFrameData(frmi);
+
+            if(tempframe->islocked)
+            {
+                tsunx = tempframe->sunoffx;
+                tsuny = tempframe->sunoffy;
+                tshdx = tempframe->shadowoffx;
+                tshdy = tempframe->shadowoffy;
+            }
+            else
+            {
+                tsunx = globalsunoffx;
+                tsuny = globalsunoffy;
+                tshdx = globalshadowoffx;
+                tshdy = globalshadowoffy;
+            }
+
+            tempshd.ReNew();
+            tempshd.Init(GetGlobalWidth(), GetGlobalHeight());
+
+            tempshd.AddFrame(tempfrmdata);
+
+            tempshddata = tempshd.MakeShadow(shdtype, 0, false, tsunx, tsuny, tshdx, tshdy, shadowalpha);
+
+            if(!tempshddata) return false;
+
+            shdproc.AddFrame(tempshddata);
+        }
+
+        wxString shdpath;
+        shdpath = wxFileName::FileName(outpath).GetPath(wxPATH_GET_SEPARATOR|wxPATH_GET_VOLUME);
+        shdpath += wxFileName::FileName(outpath).GetName();
+        shdpath += wxT(".shd");
+
+        if(!shdproc.SaveToShd(shdpath, direction, interval, bottom))return false;
+    }
+    return true;
+}
+bool WorkManager::SaveToAsf(const wxString outpath)
+{
+    MAPICDATA proc(GetGlobalWidth(), GetGlobalHeight());
+    MAPICDATA shdproc(GetGlobalWidth(), GetGlobalHeight()), tempshd;
+    FILOCRGBQUAD *tempfrmdata, *tempshddata;
+    FRAMERGBA *tempframe;
+    long tsunx, tsuny, tshdx, tshdy;
+
+    if(!makeshadow)
+    {
+        for(unsigned long frmi = 0; frmi < framecounts; frmi++)
+        {
+            tempfrmdata = GetUndeletedGlobalizedFrameData(frmi);
+            if(tempfrmdata == NULL) return false;
+
+            if(alphamask != 0)
+            {
+                MAPICDATA::MakeTransMask(tempfrmdata, GetGlobalWidth(), GetGlobalHeight(), alphamask);
+            }
+
+            if(shdincluded)
+            {
+                tempshddata = GetUndeletedGlobalizedShdFrameData(frmi);
+                if(tempshddata != NULL)
+                {
+                    for(long pixi = 0; pixi < GetGlobalWidth()*GetGlobalHeight(); pixi++)
+                    {
+                        if(tempfrmdata[pixi].rgbReserved != 0)
+                        {
+                            tempshddata[pixi].rgbBlue = tempfrmdata[pixi].rgbBlue;
+                            tempshddata[pixi].rgbGreen = tempfrmdata[pixi].rgbGreen;
+                            tempshddata[pixi].rgbRed = tempfrmdata[pixi].rgbRed;
+                            tempshddata[pixi].rgbReserved = tempfrmdata[pixi].rgbReserved;
+                        }
+                    }
+                    delete[] tempfrmdata;
+                    tempfrmdata = tempshddata;
+                }
+            }
+
+            proc.AddFrame(tempfrmdata);
+        }
+
+        if(!proc.SaveToAsf(outpath, direction, interval, bottom, left,false)) return false;
+    }
+    else
+    {
+        for(unsigned long frmi = 0; frmi < framecounts; frmi++)
+        {
+            tempfrmdata = GetUndeletedGlobalizedFrameData(frmi);
+            if(tempfrmdata == NULL) return false;
+
+            if(alphamask != 0)
+            {
+                MAPICDATA::MakeTransMask(tempfrmdata, GetGlobalWidth(), GetGlobalHeight(), alphamask);
+            }
+
+            tempframe = GetUndeletedFrameData(frmi);
+
+            if(tempframe->islocked)
+            {
+                tsunx = tempframe->sunoffx;
+                tsuny = tempframe->sunoffy;
+                tshdx = tempframe->shadowoffx;
+                tshdy = tempframe->shadowoffy;
+            }
+            else
+            {
+                tsunx = globalsunoffx;
+                tsuny = globalsunoffy;
+                tshdx = globalshadowoffx;
+                tshdy = globalshadowoffy;
+            }
+
+            tempshd.ReNew();
+            tempshd.Init(GetGlobalWidth(), GetGlobalHeight());
+
+            tempshd.AddFrame(tempfrmdata);
+            tempshddata = tempshd.MakeShadow(shdtype, 0, true, tsunx, tsuny, tshdx, tshdy, shadowalpha);
+
+            if(!tempshddata) return false;
+
+            shdproc.AddFrame(tempshddata);
+        }
+
+        if(!shdproc.SaveToAsf(outpath, direction, interval, bottom, left,false))return false;
+    }
+    return true;
+}
+bool WorkManager::SaveToGif(const wxString outpath)
+{
+    MAPICDATA proc(GetGlobalWidth(), GetGlobalHeight());
+    MAPICDATA shdproc(GetGlobalWidth(), GetGlobalHeight()), tempshd;
+    FILOCRGBQUAD *tempfrmdata, *tempshddata, bscol;
+    FRAMERGBA *tempframe;
+    long tsunx, tsuny, tshdx, tshdy;
+
+    bscol.rgbRed = (BYTE)basecolor.Red();
+    bscol.rgbGreen = (BYTE)basecolor.Green();
+    bscol.rgbBlue = (BYTE)basecolor.Blue();
+    bscol.rgbReserved = 0xFF;
+
+    if(!makeshadow)
+    {
+        for(unsigned long frmi = 0; frmi < framecounts; frmi++)
+        {
+            tempfrmdata = GetUndeletedGlobalizedFrameData(frmi);
+            if(tempfrmdata == NULL) return false;
+
+            if(alphamask != 0)
+            {
+                MAPICDATA::MakeTransMask(tempfrmdata, GetGlobalWidth(), GetGlobalHeight(), alphamask);
+            }
+
+            if(shdincluded)
+            {
+                tempshddata = GetUndeletedGlobalizedShdFrameData(frmi);
+                if(tempshddata != NULL)
+                {
+                    for(long pixi = 0; pixi < GetGlobalWidth()*GetGlobalHeight(); pixi++)
+                    {
+                        if(tempfrmdata[pixi].rgbReserved != 0)
+                        {
+                            tempshddata[pixi].rgbBlue = tempfrmdata[pixi].rgbBlue;
+                            tempshddata[pixi].rgbGreen = tempfrmdata[pixi].rgbGreen;
+                            tempshddata[pixi].rgbRed = tempfrmdata[pixi].rgbRed;
+                            tempshddata[pixi].rgbReserved = tempfrmdata[pixi].rgbReserved;
+                        }
+                    }
+                    delete[] tempfrmdata;
+                    tempfrmdata = tempshddata;
+                }
+            }
+
+            proc.AddFrame(tempfrmdata);
+        }
+
+        proc.AddBaseColor(bscol);
+
+        if(!proc.SaveToGif(outpath)) return false;
+    }
+    else
+    {
+        for(unsigned long frmi = 0; frmi < framecounts; frmi++)
+        {
+            tempfrmdata = GetUndeletedGlobalizedFrameData(frmi);
+            if(tempfrmdata == NULL) return false;
+
+            if(alphamask != 0)
+            {
+                MAPICDATA::MakeTransMask(tempfrmdata, GetGlobalWidth(), GetGlobalHeight(), alphamask);
+            }
+
+            tempframe = GetUndeletedFrameData(frmi);
+
+            if(tempframe->islocked)
+            {
+                tsunx = tempframe->sunoffx;
+                tsuny = tempframe->sunoffy;
+                tshdx = tempframe->shadowoffx;
+                tshdy = tempframe->shadowoffy;
+            }
+            else
+            {
+                tsunx = globalsunoffx;
+                tsuny = globalsunoffy;
+                tshdx = globalshadowoffx;
+                tshdy = globalshadowoffy;
+            }
+
+            tempshd.ReNew();
+            tempshd.Init(GetGlobalWidth(), GetGlobalHeight());
+
+            tempshd.AddFrame(tempfrmdata);
+            tempshddata = tempshd.MakeShadow(shdtype, 0, true, tsunx, tsuny, tshdx, tshdy, shadowalpha);
+
+            if(!tempshddata) return false;
+
+            shdproc.AddFrame(tempshddata);
+        }
+
+        shdproc.AddBaseColor(bscol);
+
+        if(!shdproc.SaveToGif(outpath))return false;
+    }
+
+    if(!GifData::FilePaletteLoctoGlb(outpath, interval)) return false;
+    return true;
+}
+bool WorkManager::SaveToPng(const wxString outpath, bool reverseFrames)
+{
+    MAPICDATA proc(GetGlobalWidth(), GetGlobalHeight());
+    MAPICDATA shdproc(GetGlobalWidth(), GetGlobalHeight()), tempshd;
+    FILOCRGBQUAD *tempfrmdata, *tempshddata;
+    FRAMERGBA *tempframe;
+    long tsunx, tsuny, tshdx, tshdy;
+
+    if(!makeshadow)
+    {
+        for(unsigned long frmidx = 0; frmidx < framecounts; frmidx++)
+        {
+        	int frmi = frmidx;
+        	if(reverseFrames)
+			{
+				frmi = (framecounts - 1) - frmidx;
+			}
+            tempfrmdata = GetUndeletedGlobalizedFrameData(frmi);
+            if(tempfrmdata == NULL) return false;
+
+            if(alphamask != 0)
+            {
+                MAPICDATA::MakeTransMask(tempfrmdata, GetGlobalWidth(), GetGlobalHeight(), alphamask);
+            }
+
+            if(shdincluded)
+            {
+                tempshddata = GetUndeletedGlobalizedShdFrameData(frmi);
+                if(tempshddata != NULL)
+                {
+                    for(long pixi = 0; pixi < GetGlobalWidth()*GetGlobalHeight(); pixi++)
+                    {
+                        if(tempfrmdata[pixi].rgbReserved != 0)
+                        {
+                            tempshddata[pixi].rgbBlue = tempfrmdata[pixi].rgbBlue;
+                            tempshddata[pixi].rgbGreen = tempfrmdata[pixi].rgbGreen;
+                            tempshddata[pixi].rgbRed = tempfrmdata[pixi].rgbRed;
+                            tempshddata[pixi].rgbReserved = tempfrmdata[pixi].rgbReserved;
+                        }
+                    }
+                    delete[] tempfrmdata;
+                    tempfrmdata = tempshddata;
+                }
+            }
+
+            proc.AddFrame(tempfrmdata);
+        }
+
+        if(!proc.SaveToPng(outpath)) return false;
+    }
+    else
+    {
+        for(unsigned long frmidx = 0; frmidx < framecounts; frmidx++)
+        {
+        	int frmi = frmidx;
+        	if(reverseFrames)
+			{
+				frmi = (framecounts - 1) - frmidx;
+			}
+            tempfrmdata = GetUndeletedGlobalizedFrameData(frmi);
+            if(tempfrmdata == NULL) return false;
+
+            if(alphamask != 0)
+            {
+                MAPICDATA::MakeTransMask(tempfrmdata, GetGlobalWidth(), GetGlobalHeight(), alphamask);
+            }
+
+            tempframe = GetUndeletedFrameData(frmi);
+
+            if(tempframe->islocked)
+            {
+                tsunx = tempframe->sunoffx;
+                tsuny = tempframe->sunoffy;
+                tshdx = tempframe->shadowoffx;
+                tshdy = tempframe->shadowoffy;
+            }
+            else
+            {
+                tsunx = globalsunoffx;
+                tsuny = globalsunoffy;
+                tshdx = globalshadowoffx;
+                tshdy = globalshadowoffy;
+            }
+
+            tempshd.ReNew();
+            tempshd.Init(GetGlobalWidth(), GetGlobalHeight());
+
+            tempshd.AddFrame(tempfrmdata);
+            tempshddata = tempshd.MakeShadow(shdtype, 0, true, tsunx, tsuny, tshdx, tshdy, shadowalpha);
+
+            if(!tempshddata) return false;
+
+            shdproc.AddFrame(tempshddata);
+        }
+
+        if(!shdproc.SaveToPng(outpath))return false;
+    }
+
+    return true;
+}
+
+bool WorkManager::SetFrameLock(unsigned long index, bool locked)
+{
+    FRAMERGBA *temp;
+
+    temp = GetUndeletedFrameData(index);
+    if(temp == NULL)return false;
+
+    temp->islocked = locked;
+    return true;
+}
+bool WorkManager::SetFrameSunX(unsigned long index, long Sunx)
+{
+    FRAMERGBA *temp;
+
+    temp = GetUndeletedFrameData(index);
+    if(temp == NULL)return false;
+
+    temp->sunoffx = Sunx;
+    return true;
+}
+bool WorkManager::SetFrameSunY(unsigned long index, long Suny)
+{
+    FRAMERGBA *temp;
+
+    temp = GetUndeletedFrameData(index);
+    if(temp == NULL)return false;
+
+    temp->sunoffy = Suny;
+    return true;
+}
+bool WorkManager::SetFrameShadowX(unsigned long index, long ShadowX)
+{
+    FRAMERGBA *temp;
+
+    temp = GetUndeletedFrameData(index);
+    if(temp == NULL)return false;
+
+    temp->shadowoffx = ShadowX;
+    return true;
+}
+bool WorkManager::SetFrameShadowY(unsigned long index, long ShadowY)
+{
+    FRAMERGBA *temp;
+
+    temp = GetUndeletedFrameData(index);
+    if(temp == NULL)return false;
+
+    temp->shadowoffy = ShadowY;
+    return true;
+}
+bool WorkManager::IsFrameLocked(unsigned long index)
+{
+    FRAMERGBA *temp;
+
+    temp = GetUndeletedFrameData(index);
+    if(temp == NULL)return false;
+
+    return temp->islocked;
+}
+long WorkManager::GetFrameSunX(unsigned long index)
+{
+    FRAMERGBA *temp;
+
+    temp = GetUndeletedFrameData(index);
+    if(temp == NULL)return 0;
+
+    return temp->sunoffx;
+}
+long WorkManager::GetFrameSunY(unsigned long index)
+{
+    FRAMERGBA *temp;
+
+    temp = GetUndeletedFrameData(index);
+    if(temp == NULL)return 0;
+
+    return temp->sunoffy;
+}
+long WorkManager::GetFrameShadowX(unsigned long index)
+{
+    FRAMERGBA *temp;
+
+    temp = GetUndeletedFrameData(index);
+    if(temp == NULL)return 0;
+
+    return temp->shadowoffx;
+}
+long WorkManager::GetFrameShadowY(unsigned long index)
+{
+    FRAMERGBA *temp;
+
+    temp = GetUndeletedFrameData(index);
+    if(temp == NULL)return 0;
+
+    return temp->shadowoffy;
+}
+
+/////////////////
+//private
+/////////////////
+void WorkManager::FreeRGBAData()
+{
+    if(firstframe != NULL)
+    {
+        FRAMERGBA *cur, *next;
+        cur = firstframe;
+        next = cur->next;
+        for(; cur != NULL;)
+        {
+            delete[] cur->data;
+            if(cur->shddata != NULL) delete[] cur->shddata;
+            delete cur;
+            cur = next;
+            if(cur != NULL)next = cur->next;
+        }
+    }
+}
+void WorkManager::AddBaseColor(FILOCRGBQUAD *inout, long width, long height)
+{
+    unsigned char alpha;
+    for(long pixi = 0; pixi < width*height; pixi++)
+    {
+        alpha = inout[pixi].rgbReserved;
+        if(alpha == 0) continue;
+
+        inout[pixi].rgbRed   = (BYTE)(((double)inout[pixi].rgbRed)*((double)alpha/(double)0xFF) +
+                                      ((double)basecolor.Red())*((double)(0xFF-alpha)/(double)0xFF));
+        inout[pixi].rgbGreen = (BYTE)(((double)inout[pixi].rgbGreen)*((double)alpha/(double)0xFF) +
+                                      ((double)basecolor.Green())*((double)(0xFF-alpha)/(double)0xFF));
+        inout[pixi].rgbBlue  = (BYTE)(((double)inout[pixi].rgbBlue)*((double)alpha/(double)0xFF) +
+                                      ((double)basecolor.Blue())*((double)(0xFF-alpha)/(double)0xFF));
+        inout[pixi].rgbReserved = 0xFF;
+    }
+}
